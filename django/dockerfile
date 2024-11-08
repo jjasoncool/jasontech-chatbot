@@ -1,0 +1,66 @@
+ARG PY_VER
+FROM python:${PY_VER}
+
+# If you using proxy
+# ENV http_proxy http://tmws1.pxy.sysco:8080
+# ENV https_proxy http://tmws1.pxy.sysco:8080
+
+# If you using MSSQL database, you needs to install driver
+# RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+# RUN curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list
+# RUN apt-get update && ACCEPT_EULA=Y apt-get install -y msodbcsql17
+
+# postgresql drivers
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        postgresql-client unixodbc-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/app
+RUN mkdir /config
+COPY requirements.txt /config/requirements.txt
+RUN pip install --upgrade pip
+RUN pip install -r /config/requirements.txt
+
+ARG PROJECT_NAME
+ARG ALLOWED_HOSTS
+ARG CSRF_TRUSTED_ORIGINS
+ARG SUB_PATH
+ARG TIMEZONE
+ARG LANGCODE
+RUN django-admin startproject ${PROJECT_NAME}
+
+WORKDIR /usr/src/app/${PROJECT_NAME}
+# uwsgi
+ENV PROJECT_NAME=${PROJECT_NAME}
+COPY start.sh start.sh
+RUN chmod +x ./start.sh
+COPY uwsgi.ini uwsgi.ini
+# create project
+RUN python manage.py startapp mainsite
+# import os
+RUN sed -i "s|from pathlib import Path|import os\nfrom pathlib import Path|g;" ./${PROJECT_NAME}/settings.py
+# 取代預設 ALLOW_HOST 與 STATIC_URL字串
+RUN sed -i "s|ALLOWED_HOSTS = \[\]|\
+ALLOWED_HOSTS = \[${ALLOWED_HOSTS}\]\n\
+CSRF_TRUSTED_ORIGINS = \[${CSRF_TRUSTED_ORIGINS}\]\n\
+# 網址後面的 sub_path，通常用來轉址用\n\
+FORCE_SCRIPT_NAME = '${SUB_PATH}'|g;" ./${PROJECT_NAME}/settings.py
+# TIMEZONE
+RUN sed -i "s|TIME_ZONE[^\\n]*|TIME_ZONE = '${TIMEZONE}'|g;" ./${PROJECT_NAME}/settings.py
+# LANGCODE
+RUN sed -i "s|LANGUAGE_CODE[^\\n]*|LANGUAGE_CODE = '${LANGCODE}'|g;" ./${PROJECT_NAME}/settings.py
+
+RUN sed -i "s|STATIC_URL = 'static/'|\
+# STATIC ROOT 和 STATIC URL\n\
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')\n\
+STATIC_URL = 'static/'\n\
+# MEDIA ROOT 和 MEDIA URL\n\
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')\n\
+MEDIA_URL = 'media/'|g;" ./${PROJECT_NAME}/settings.py
+
+# 新增其他設定
+RUN echo '\n' >> ./${PROJECT_NAME}/settings.py
+
+# start service
+CMD bash ./start.sh

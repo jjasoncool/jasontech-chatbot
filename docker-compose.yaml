@@ -1,0 +1,111 @@
+version: '3.9'
+
+services:
+  django:
+    build:
+      context: "./django/"
+      args:
+        PY_VER: ${PY_VER}
+        PROJECT_NAME: ${PROJECT_NAME}
+        ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+        CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+        SUB_PATH: ${SUB_PATH}
+        TIMEZONE: ${TIMEZONE}
+        LANGCODE: ${LANGCODE}
+    environment:
+      - TZ=Asia/Taipei
+      - DB_HOST=db
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_DATABASE=${DB_DATABASE}
+    depends_on:
+      - db
+    expose:
+      - "${DJANGO_PORT}"
+    volumes:
+      - django-src:/usr/src/app
+    container_name: "${DJANGO_NAME}"
+    restart: always
+
+  nginx:
+    build:
+      context: "./nginx/"
+      args:
+        NGINX_VERSION: ${NGINX_VERSION}
+    environment:
+      - TZ=Asia/Taipei
+      - NGINX_PORT=${NGINX_PORT}
+    depends_on:
+      - django
+    ports:
+      - 8000:${NGINX_PORT}
+    volumes:
+      - nginx-config:/etc/nginx/templates/
+      - ./src/${PROJECT_NAME}/static:/usr/share/nginx/html/static
+      - ./src/${PROJECT_NAME}/media:/usr/share/nginx/html/media
+    container_name: "${NGINX_NAME}"
+    restart: always
+
+  db:
+    image: postgres:${DB_VERSION}
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_DATABASE}
+    container_name: ${DB_NAME}
+    ports:
+      - ${DB_PORT}
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  vector_db:
+    image: chromadb/chroma:latest
+    container_name: vector_db
+    ports:
+      - 8001:8000
+    volumes:
+      - ./vector_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma # this is the default path, change it as needed
+      - ANONYMIZED_TELEMETRY=${ANONYMIZED_TELEMETRY:-TRUE}
+
+  ollama:
+    image: ollama/ollama:${OLLAMA_VERSION}
+    container_name: ollama
+    ports:
+      - 11435:11434
+    volumes:
+      - ./ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: always
+
+volumes:
+  django-src:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "./src/"
+    external: false
+
+  nginx-config:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "./config/nginx/"
+    external: false
+
+networks:
+  default:
+    name: ${NET_WORK}
+    external: true
