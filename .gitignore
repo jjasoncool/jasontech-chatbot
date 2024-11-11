@@ -1,6 +1,10 @@
+# config files
 .env
 /config/*
 /*_data/
 __pycache__/
 db.sqlite3
-node_modules/
+# packages
+**/node_modules/
+# static files
+**/media/uploads/*
