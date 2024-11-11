@@ -38,6 +38,8 @@ RUN chmod +x ./start.sh
 COPY uwsgi.ini uwsgi.ini
 # create project
 RUN python manage.py startapp mainsite
+# 修改 settings.py INSTALLED_APPS = [ 新增 'mainsite',
+RUN sed -i "s|INSTALLED_APPS = \[|INSTALLED_APPS = \[\n    'mainsite',|g;" ./${PROJECT_NAME}/settings.py
 # import os
 RUN sed -i "s|from pathlib import Path|import os\nfrom pathlib import Path|g;" ./${PROJECT_NAME}/settings.py
 # 取代預設 ALLOW_HOST 與 STATIC_URL字串

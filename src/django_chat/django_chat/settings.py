@@ -34,6 +34,7 @@ FORCE_SCRIPT_NAME = '/'
 # Application definition
 
 INSTALLED_APPS = [
+    'mainsite',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
