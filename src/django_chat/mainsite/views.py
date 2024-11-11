@@ -8,6 +8,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from .models import UploadFile
 from .serializers import UploadedFileSerializer
 from .services import get_embedding_model, get_chroma_client
+from .visualization import visualize_vectors
 
 from django.http import JsonResponse
 
@@ -32,17 +33,14 @@ class FileUploadView(APIView):
             json_content = json.loads(file_content)
 
             # 計算總句子數量
-            total_sentences = 0
-            for item in json_content:
-                content = item.get('content', '')
+            total_sentences = sum(len(item.get('content', '').split('.')) for item in json_content)
 
-                if content:
-                    sentences = content.split('.')
-                    total_sentences += len(sentences)
-
-            # 將句子轉換為向量並插入到 ChromaDB
+            # 批量插入向量
             processed_sentences = 0
             batch_size = 10  # 設定批次大小
+            vectors_batch = []
+            metadata_batch = []
+            documents_batch = []
             for item in json_content:
                 content = item.get('content', '')
 
@@ -52,17 +50,28 @@ class FileUploadView(APIView):
                     for i in range(0, len(sentences), batch_size):
                         batch = sentences[i:i + batch_size]
                         vectors = model.encode(batch)  # 批量轉換句子為向量
-                        for sentence, vector in zip(batch, vectors):
-                            metadata = {"content": sentence}
-                            client.insert_vector(vector, metadata, sentence)
-                            processed_sentences += 1
+
+                        vectors_batch.extend(vectors)  # 收集向量
+                        metadata_batch.extend([{"content": sentence} for sentence in batch])  # 收集元數據
+                        documents_batch.extend(batch)  # 收集文件
+                        processed_sentences += len(batch)
+
+                        # 每處理完一個批次，插入向量資料
+                        if len(vectors_batch) >= batch_size:
+                            client.insert_multiple_vectors(vectors=vectors_batch, metadatas=metadata_batch, documents=documents_batch)
+                            vectors_batch = []
+                            metadata_batch = []
+                            documents_batch = []
 
                         # 回報進度
                         progress = (processed_sentences / total_sentences) * 100
                         print(f"Progress: {progress:.2f}%")
-
-                        # 重置超時計時器
                         request.session.modified = True
+
+            # 插入最後一批向量
+            if vectors_batch:
+                client.insert_multiple_vectors(vectors=vectors_batch, metadatas=metadata_batch, documents=batch)
+
 
             # 儲存檔案資訊到資料庫
             file_instance = UploadFile(file=file)
@@ -108,3 +117,17 @@ def query_chromadb(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def visualize_chromadb(request):
+    client = get_chroma_client()
+    vectors, metadatas, documents = client.get_all_vectors()
+    if not vectors:
+        return render(request, 'visualization.html', {'error': 'No vectors to visualize'})
+
+    output_path = 'static/visualization.png'
+    visualize_vectors(vectors, metadatas, documents, output_path)
+
+    output_path = output_path.replace('static/', '')
+
+    return render(request, 'visualization.html', {'output_path': output_path})

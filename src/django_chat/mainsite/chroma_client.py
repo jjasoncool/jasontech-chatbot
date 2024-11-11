@@ -19,6 +19,16 @@ class ChromaDBClient:
             documents=[document]
         )
 
+    def insert_multiple_vectors(self, vectors, metadatas, documents):
+        """插入多筆向量和元數據到 ChromaDB"""
+        unique_ids = [str(uuid.uuid4()) for _ in range(len(vectors))]  # 生成唯一 ID 列表
+        self.collection.add(
+            ids=unique_ids,
+            embeddings=vectors,
+            metadatas=metadatas,
+            documents=documents
+        )
+
     def query_vector(self, query_vector, n_results=5):
         """查詢相似向量"""
         results = self.collection.query(
@@ -30,7 +40,19 @@ class ChromaDBClient:
     def list_vectors(self, n_results=5):
         """列出資料庫內有的前幾筆資料"""
         results = self.collection.query(
-            query_texts=["spacex"],  # 匹配所有文本
+            query_texts=["*"],  # 匹配所有文本
             n_results=n_results
         )
         return results
+
+    def get_all_vectors(self):
+        """提取所有向量和元數據"""
+        results = self.collection.query(
+            query_texts=["*"],  # 匹配所有文本
+            n_results=1000,  # 設置提取的最大數量
+            include=['embeddings', 'metadatas', 'documents']
+        )
+        vectors = results['embeddings']
+        metadatas = results['metadatas']
+        documents = results['documents']
+        return vectors, metadatas, documents

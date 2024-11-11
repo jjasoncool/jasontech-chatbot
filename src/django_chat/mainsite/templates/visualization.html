@@ -1,0 +1,15 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ChromaDB Visualization</title>
+</head>
+<body>
+    <h1>ChromaDB Visualization</h1>
+    {% if error %}
+        <p>{{ error }}</p>
+    {% else %}
+        <img src="{% static output_path %}" alt="ChromaDB Visualization">
+    {% endif %}
+</body>
+</html>

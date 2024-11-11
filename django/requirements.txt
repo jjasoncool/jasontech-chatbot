@@ -3,6 +3,8 @@ djangorestframework
 uwsgi
 pytz
 requests
+numpy
+matplotlib
 chromadb
 psycopg2-binary
 python-dotenv
