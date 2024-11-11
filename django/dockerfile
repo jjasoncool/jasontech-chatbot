@@ -16,6 +16,8 @@ RUN apt-get update \
         postgresql-client unixodbc-dev \
     && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /cache/huggingface/hub && chmod -R 777 /cache
+
 WORKDIR /usr/src/app
 RUN mkdir /config
 COPY requirements.txt /config/requirements.txt

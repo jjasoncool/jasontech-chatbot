@@ -19,6 +19,7 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASS=${DB_PASS}
       - DB_DATABASE=${DB_DATABASE}
+      - HF_HOME=/cache/huggingface
     depends_on:
       - db
     expose:
