@@ -32,11 +32,17 @@ def visualize_vectors(vectors, metadatas, documents, output_path='static/visuali
 
     # 繪製散點圖
     plt.figure(figsize=(10, 10))
-    plt.scatter(reduced_vectors[:, 0], reduced_vectors[:, 1], c='blue', alpha=0.5)
+    plt.scatter(reduced_vectors[:, 0], reduced_vectors[:, 1], c='blue', alpha=0.5, label="Document Points")
 
     # 添加標籤
-    for i, doc in enumerate(documents):
-        plt.annotate(doc, (reduced_vectors[i, 0], reduced_vectors[i, 1]))
+    for i, doc in enumerate([d for sublist in documents for d in sublist]):
+        print(f"Document: {i}")
+        doc = doc.replace('$', '\u0024')  # 處理特殊字符，直接替換
+        doc_label = doc[:15] + "..." if len(doc) > 15 else doc  # 縮短長標籤
+
+        # 使用 i 確保標籤對應正確的點
+        plt.annotate(doc_label, (reduced_vectors[i, 0], reduced_vectors[i, 1]),
+                     xytext=(5, 2), textcoords='offset points', fontsize=8, alpha=0.7)
 
     plt.title('ChromaDB Vectors Visualization')
     plt.xlabel('Dimension 1')

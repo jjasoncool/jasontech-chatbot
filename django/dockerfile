@@ -16,13 +16,13 @@ RUN apt-get update \
         postgresql-client unixodbc-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /cache/huggingface/hub && chmod -R 777 /cache
-
 WORKDIR /usr/src/app
 RUN mkdir /config
 COPY requirements.txt /config/requirements.txt
 RUN pip install --upgrade pip
 RUN pip install -r /config/requirements.txt
+
+RUN mkdir -p /cache/huggingface/hub && chmod -R 777 /cache && chmod -R 777 /root
 
 ARG PROJECT_NAME
 ARG ALLOWED_HOSTS

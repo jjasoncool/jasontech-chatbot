@@ -1,6 +1,7 @@
 # Create your views here.
 from django.shortcuts import render
 import json
+import nltk
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -11,6 +12,9 @@ from .services import get_embedding_model, get_chroma_client
 from .visualization import visualize_vectors
 
 from django.http import JsonResponse
+
+nltk.download('punkt')
+nltk.download('punkt_tab')
 
 class FileUploadView(APIView):
     parser_classes = [MultiPartParser, FormParser]
@@ -32,29 +36,29 @@ class FileUploadView(APIView):
             file_content = file.read().decode('utf-8')
             json_content = json.loads(file_content)
 
-            # 計算總句子數量
-            total_sentences = sum(len(item.get('content', '').split('.')) for item in json_content)
-
-            # 批量插入向量
-            processed_sentences = 0
+            # 過濾掉內容為 null 的項目
+            json_content = [item for item in json_content if item.get('content') is not None]
             batch_size = 10  # 設定批次大小
-            vectors_batch = []
-            metadata_batch = []
-            documents_batch = []
-            for item in json_content:
+
+            for idx, item in enumerate(json_content):
                 content = item.get('content', '')
+                url = item.get('url', 'N/A')
+                title = item.get('title', 'N/A')
 
                 if content:
-                    sentences = content.split('.')
+                    sentences = nltk.sent_tokenize(content)  # 切分句子
+                    vectors_batch = []
+                    metadata_batch = []
+                    documents_batch = []
 
                     for i in range(0, len(sentences), batch_size):
                         batch = sentences[i:i + batch_size]
                         vectors = model.encode(batch)  # 批量轉換句子為向量
 
-                        vectors_batch.extend(vectors)  # 收集向量
-                        metadata_batch.extend([{"content": sentence} for sentence in batch])  # 收集元數據
-                        documents_batch.extend(batch)  # 收集文件
-                        processed_sentences += len(batch)
+                        # 收集向量、元數據和文件
+                        vectors_batch.extend(vectors)
+                        metadata_batch.extend([{"url": url, "title": title, "content": sentence} for sentence in batch])
+                        documents_batch.extend(batch)
 
                         # 每處理完一個批次，插入向量資料
                         if len(vectors_batch) >= batch_size:
@@ -63,15 +67,13 @@ class FileUploadView(APIView):
                             metadata_batch = []
                             documents_batch = []
 
-                        # 回報進度
-                        progress = (processed_sentences / total_sentences) * 100
-                        print(f"Progress: {progress:.2f}%")
-                        request.session.modified = True
+                    # 插入最後一批向量
+                    if vectors_batch:
+                        client.insert_multiple_vectors(vectors=vectors_batch, metadatas=metadata_batch, documents=batch)
 
-            # 插入最後一批向量
-            if vectors_batch:
-                client.insert_multiple_vectors(vectors=vectors_batch, metadatas=metadata_batch, documents=batch)
-
+                # 回報每筆 JSON 條目已處理
+                print(f"Processed item {idx + 1}/{len(json_content)}: {title}")
+                request.session.modified = True  # 更新 session 狀態以防止超時
 
             # 儲存檔案資訊到資料庫
             file_instance = UploadFile(file=file)

@@ -21,6 +21,7 @@ class ChromaDBClient:
 
     def insert_multiple_vectors(self, vectors, metadatas, documents):
         """插入多筆向量和元數據到 ChromaDB"""
+        # print(f"Inserting {documents} into ChromaDB...")
         unique_ids = [str(uuid.uuid4()) for _ in range(len(vectors))]  # 生成唯一 ID 列表
         self.collection.add(
             ids=unique_ids,
@@ -40,8 +41,9 @@ class ChromaDBClient:
     def list_vectors(self, n_results=5):
         """列出資料庫內有的前幾筆資料"""
         results = self.collection.query(
-            query_texts=["*"],  # 匹配所有文本
-            n_results=n_results
+            query_texts=["*"],
+            n_results=n_results,
+            # include=['embeddings', 'metadatas', 'documents']
         )
         return results
 
