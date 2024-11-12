@@ -145,19 +145,39 @@ def query_ollama(request):
     if not question:
         return JsonResponse({"error": "No question provided"}, status=400)
 
-    # 使用遠端伺服器上的 Ollama API
+    # 初始化 ChromaDB 客戶端
+    client = get_chroma_client()
+    if client is None:
+        return JsonResponse({"error": "ChromaDB client could not be initialized."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     try:
+        # 使用嵌入模型將問題轉換為向量
+        model = get_embedding_model()
+        if model is None:
+            return JsonResponse({"error": "Embedding model could not be loaded."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        question_vector = model.encode([question])[0]
+
+        # 查詢 ChromaDB 內的相關向量資料
+        chromadb_results = client.query_vector(question_vector, n_results=5)
+        # print(chromadb_results)
+        references = "\n".join([
+            f"Title: {result['title']}\nContent: {result['content']}\nURL: {result['url']}"
+            for result in chromadb_results['metadatas'][0]
+        ])
+        # print(references)
+
+        # 使用遠端伺服器上的 Ollama API
         response = requests.post(
             "http://ollama:11434/v1/completions",  # 使用您驗證過的 URL
             json={
                 "model": "llama3.2-vision",  # 使用您已驗證的模型名稱
-                "prompt": question
+                "prompt": f"Question:[{question}]\n\nReferences:[{references}]\n\nPlease answer the question and use references to enrich your answer.",  # 將參考資料添加到提示中
             },
             headers={"Content-Type": "application/json"}
         )
         response.raise_for_status()
         ollama_response = response.json()
-        print(ollama_response)
 
         # 提取並返回 Ollama 的回答
         choices = ollama_response.get("choices", [])
@@ -166,6 +186,7 @@ def query_ollama(request):
         else:
             answer = "No response from Ollama."
 
-        return JsonResponse({"ollama_answer": answer})
+        return JsonResponse({"ollama_answer": answer, "references": references})
+
     except requests.RequestException as e:
         return JsonResponse({"error": str(e)}, status=500)
