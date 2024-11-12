@@ -38,10 +38,10 @@ class ChromaDBClient:
         )
         return results
 
-    def list_vectors(self, n_results=5):
+    def list_vectors(self, n_results=5, query_texts=None):
         """列出資料庫內有的前幾筆資料"""
         results = self.collection.query(
-            query_texts=["*"],
+            query_texts=[query_texts] if query_texts else ["*"],
             n_results=n_results,
             # include=['embeddings', 'metadatas', 'documents']
         )

@@ -113,7 +113,11 @@ def query_chromadb(request):
     try:
         # 查詢 ChromaDB 內的所有資料
         n_results = int(request.GET.get('n_results', 10))  # 默認查詢 10 筆
-        results = client.list_vectors(n_results=n_results)
+        keyword = request.GET.get('keyword', '')
+        if keyword != '':
+            results = client.list_vectors(n_results=n_results, query_texts=keyword)
+        else:
+            results = client.list_vectors(n_results=n_results)
         print(results)
         return JsonResponse({"results": results})
 
