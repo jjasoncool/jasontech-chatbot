@@ -1,6 +1,6 @@
 # Create your views here.
 from django.shortcuts import render
-import json
+import json, requests
 import nltk
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -137,3 +137,35 @@ def visualize_chromadb(request):
     output_path = output_path.replace('static/', '')
 
     return render(request, 'visualization.html', {'output_path': output_path})
+
+
+def query_ollama(request):
+    # 從請求中獲取用戶問題
+    question = request.GET.get('question', '')
+    if not question:
+        return JsonResponse({"error": "No question provided"}, status=400)
+
+    # 使用遠端伺服器上的 Ollama API
+    try:
+        response = requests.post(
+            "http://ollama:11434/v1/completions",  # 使用您驗證過的 URL
+            json={
+                "model": "llama3.2-vision",  # 使用您已驗證的模型名稱
+                "prompt": question
+            },
+            headers={"Content-Type": "application/json"}
+        )
+        response.raise_for_status()
+        ollama_response = response.json()
+        print(ollama_response)
+
+        # 提取並返回 Ollama 的回答
+        choices = ollama_response.get("choices", [])
+        if choices:
+            answer = choices[0].get("text", "No response from Ollama.")
+        else:
+            answer = "No response from Ollama."
+
+        return JsonResponse({"ollama_answer": answer})
+    except requests.RequestException as e:
+        return JsonResponse({"error": str(e)}, status=500)
