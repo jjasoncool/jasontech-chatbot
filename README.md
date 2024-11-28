@@ -1,4 +1,4 @@
-# django-playground
+# django-chatbot-api
 
 ## Setup
 
